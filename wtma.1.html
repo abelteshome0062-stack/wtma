@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WTMA // Quantum Visual Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        cyber: {
+                            50: '#f0fdf4',
+                            500: '#10b981',
+                            600: '#059669',
+                            950: '#022c22',
+                        },
+                        neon: {
+                            cyan: '#06b6d4',
+                            purple: '#8b5cf6',
+                            pink: '#ec4899',
+                            lime: '#84cc16'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(1deg); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.03); }
+        }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(1000%); }
+        }
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-glow { animation: pulse-glow 4s ease-in-out infinite; }
+        .scanline::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(6, 182, 212, 0.6), transparent);
+            animation: scanline 3s linear infinite;
+            pointer-events: none;
+        }
+        /* Low-end device optimization: GPU acceleration */
+        .hardware-accelerated {
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #030712; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #374151; }
+    </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 font-sans selection:bg-neon-cyan selection:text-slate-950 antialiased flex flex-col min-h-screen overflow-x-hidden">
+
+    <header class="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-50 hardware-accelerated">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-neon-cyan via-neon-purple to-neon-pink p-[1px] shadow-lg shadow-neon-cyan/20">
+                    <div class="w-full h-full bg-slate-950 rounded-[11px] flex items-center justify-center">
+                        <i data-lucide="zap" class="w-5 h-5 text-neon-cyan animate-pulse"></i>
+                    </div>
+                </div>
+                <div>
+                    <span class="text-lg font-extrabold tracking-wider bg-gradient-to-r from-white via-slate-200 to-neon-cyan bg-clip-text text-transparent">WTMA<span class="text-neon-cyan">.AI</span></span>
+                    <span class="block text-[10px] tracking-widest text-slate-500 uppercase font-mono">Quantum Studio v3.1</span>
+                </div>
+            </div>
+
+            <!-- Daily Quota Tracker Badge -->
+            <div class="flex items-center space-x-3 bg-slate-900/90 border border-slate-800 rounded-full px-4 py-1.5 shadow-inner">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="battery-charging" class="w-4 h-4 text-neon-cyan"></i>
+                    <span class="text-xs font-medium text-slate-300">Daily Credits:</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span id="quotaCount" class="text-xs font-bold font-mono text-neon-cyan">10</span>
+                    <span class="text-xs text-slate-500">/ 10</span>
+                </div>
+                <div class="w-16 h-2 bg-slate-800 rounded-full overflow-hidden hidden sm:block">
+                    <div id="quotaBar" class="h-full bg-gradient-to-r from-neon-cyan to-neon-purple transition-all duration-500" style="width: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Left Panel: Prompt & Controls -->
+        <section class="lg:col-span-5 space-y-5 flex flex-col">
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl relative overflow-hidden hardware-accelerated">
+                <div class="absolute -top-24 -left-24 w-48 h-48 bg-neon-purple/10 rounded-full blur-3xl pointer-events-none animate-glow"></div>
+                <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-neon-cyan/10 rounded-full blur-3xl pointer-events-none animate-glow"></div>
+
+                <div class="space-y-5 relative z-10">
+                    <div class="flex items-center justify-between">
+                        <h1 class="text-lg font-bold text-white tracking-tight flex items-center space-x-2">
+                            <i data-lucide="cpu" class="w-5 h-5 text-neon-cyan"></i>
+                            <span>Prompt Synthesizer</span>
+                        </h1>
+                        <button id="magicWandBtn" type="button" class="px-3 py-1.5 rounded-xl bg-neon-purple/10 border border-neon-purple/30 text-neon-purple hover:bg-neon-purple/20 text-xs font-semibold transition flex items-center space-x-1.5 group shadow-sm">
+                            <i data-lucide="wand-2" class="w-3.5 h-3.5 group-hover:rotate-12 transition-transform"></i>
+                            <span>Magic Enhance</span>
+                        </button>
+                    </div>
+
+                    <!-- Prompt Input Area -->
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label for="promptInput" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Vision Description</label>
+                            <span id="charCount" class="text-[10px] text-slate-500 font-mono">0 / 500</span>
+                        </div>
+                        <div class="relative">
+                            <textarea id="promptInput" rows="4" maxlength="500" class="w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-neon-cyan focus:border-transparent transition resize-none shadow-inner font-sans" placeholder="E.g., A cybernetic samurai standing on a neon-drenched Tokyo skyscraper rooftop during a thunderstorm, cinematic lighting, masterpiece 8k..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Artistic Style Selector Grid -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Artistic Aesthetic</label>
+                        <div class="grid grid-cols-3 gap-2" id="styleSelector">
+                            <button type="button" data-style="Photorealistic Cinematic 8k Masterpiece" class="style-btn p-2.5 text-xs font-medium rounded-xl border border-neon-cyan bg-neon-cyan/10 text-neon-cyan transition text-center truncate shadow-sm">Photoreal</button>
+                            <button type="button" data-style="Cyberpunk Neon Sci-Fi Hyperdetailed" class="style-btn p-2.5 text-xs font-medium rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 transition text-center truncate">Cyberpunk</button>
+                            <button type="button" data-style="Anime Studio Ghibli Fantasy Magical Atmosphere" class="style-btn p-2.5 text-xs font-medium rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 transition text-center truncate">Anime</button>
+                            <button type="button" data-style="Oil Painting Renaissance Dramatic Lighting" class="style-btn p-2.5 text-xs font-medium rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 transition text-center truncate">Oil Paint</button>
+                            <button type="button" data-style="Minimalist 3D Render Smooth Claymation" class="style-btn p-2.5 text-xs font-medium rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 transition text-center truncate">3D Clay</button>
+                            <button type="button" data-style="Vibrant Watercolor Dreamy Illustration" class="style-btn p-2.5 text-xs font-medium rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 transition text-center truncate">Watercolor</button>
+                        </div>
+                    </div>
+
+                    <!-- Aspect Ratio Selector -->
+                    <div class="space-y-2">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 font-mono">Aspect Ratio</label>
+                        <div class="grid grid-cols-3 gap-2" id="ratioSelector">
+                            <button type="button" data-ratio="1:1" class="ratio-btn p-2 text-xs font-medium rounded-xl border border-neon-cyan bg-neon-cyan/10 text-neon-cyan transition text-center">Square (1:1)</button>
+                            <button type="button" data-ratio="16:9" class="ratio-btn p-2 text-xs font-medium rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 transition text-center">Widescreen (16:9)</button>
+                            <button type="button" data-ratio="9:16" class="ratio-btn p-2 text-xs font-medium rounded-xl border border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 transition text-center">Portrait (9:16)</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Action Button -->
+                <div class="pt-5 mt-5 border-t border-slate-800/80 relative z-10">
+                    <button id="generateBtn" class="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-neon-cyan via-neon-purple to-neon-pink text-slate-950 font-extrabold shadow-lg shadow-neon-cyan/25 hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-neon-cyan focus:ring-offset-2 focus:ring-offset-slate-950 transition flex items-center justify-center space-x-2 hardware-accelerated">
+                        <i data-lucide="sparkles" class="w-5 h-5"></i>
+                        <span class="tracking-wide">GENERATE ARTWORK</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Preview, Gallery & Actions -->
+        <section class="lg:col-span-7 flex flex-col space-y-5">
+            <!-- Active Canvas Viewport -->
+            <div id="outputContainer" class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl flex flex-col items-center justify-center min-h-[420px] relative overflow-hidden group hardware-accelerated scanline">
+                
+                <!-- Initial / Empty State -->
+                <div id="emptyState" class="text-center py-12 px-4 space-y-4">
+                    <div class="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/50 flex items-center justify-center mx-auto text-slate-400 shadow-inner animate-float">
+                        <i data-lucide="image" class="w-8 h-8 text-neon-cyan"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-200">Quantum Canvas Ready</h3>
+                        <p class="text-xs text-slate-400 max-w-sm mt-1">Configure your vision parameters on the left or select an inspiration preset below to instantly synthesize high-end imagery.</p>
+                    </div>
+                </div>
+
+                <!-- Low-End Optimized Loading State -->
+                <div id="loadingState" class="hidden flex-col items-center justify-center py-16 space-y-5">
+                    <div class="relative">
+                        <div class="w-16 h-16 rounded-full border-4 border-neon-cyan/20 border-t-neon-cyan animate-spin"></div>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <div class="w-6 h-6 rounded-full bg-neon-cyan/40 animate-ping"></div>
+                        </div>
+                    </div>
+                    <div class="text-center space-y-1">
+                        <p class="text-sm font-bold text-white tracking-wide uppercase font-mono">Synthesizing Pixels...</p>
+                        <p id="loadingStatusText" class="text-xs text-neon-cyan font-mono">Neural weights converging...</p>
+                    </div>
+                </div>
+
+                <!-- Generated Result State -->
+                <div id="resultState" class="hidden w-full h-full flex flex-col items-center justify-center space-y-4">
+                    <div class="relative rounded-xl overflow-hidden border border-slate-800 shadow-2xl max-h-[460px] bg-slate-950 flex items-center justify-center group/img">
+                        <img id="generatedImage" src="" alt="Generated AI Artwork" class="object-contain max-h-[420px] w-auto rounded-lg hardware-accelerated">
+                        <!-- Quick overlay on hover -->
+                        <div class="absolute inset-0 bg-slate-950/60 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center space-x-3 backdrop-blur-xs">
+                            <button id="overlayFullScreenBtn" class="p-3 rounded-xl bg-slate-900/90 border border-slate-700 text-white hover:bg-neon-cyan hover:text-slate-950 transition shadow-lg" title="Full Screen">
+                                <i data-lucide="maximize-2" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Action Toolbar -->
+                    <div class="flex items-center justify-between w-full pt-2 flex-wrap gap-2">
+                        <span id="promptMetaTag" class="text-xs text-slate-400 truncate max-w-[200px] sm:max-w-xs font-mono"></span>
+                        <div class="flex items-center space-x-2">
+                            <button id="fullScreenBtn" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-medium text-slate-200 transition flex items-center space-x-1.5 border border-slate-800 shadow-sm">
+                                <i data-lucide="maximize" class="w-4 h-4 text-neon-cyan"></i>
+                                <span>Full Screen</span>
+                            </button>
+                            <button id="shareBtn" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-xs font-medium text-slate-200 transition flex items-center space-x-1.5 border border-slate-800 shadow-sm">
+                                <i data-lucide="share-2" class="w-4 h-4 text-neon-purple"></i>
+                                <span>Share</span>
+                            </button>
+                            <button id="downloadBtn" class="px-4 py-2 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-slate-950 font-bold text-xs transition flex items-center space-x-1.5 shadow-lg shadow-neon-cyan/20 hover:opacity-95">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                                <span>Download</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inspiration Sample Gallery -->
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center space-x-1.5">
+                        <i data-lucide="compass" class="w-4 h-4 text-neon-pink"></i>
+                        <span>Inspiration Matrix</span>
+                    </h3>
+                    <span class="text-[11px] text-slate-500 font-mono">Click card to load prompt</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="sample-card group relative rounded-xl overflow-hidden border border-slate-800/80 cursor-pointer aspect-square bg-slate-950 transition hover:border-neon-cyan shadow-md" data-prompt="A majestic cosmic tiger made of glowing stardust and nebula clouds, cinematic lighting, 8k resolution" data-style="Photorealistic Cinematic 8k Masterpiece">
+                        <img src="https://placehold.co/300x300/022c22/10b981?text=Cosmic+Tiger" alt="Sample" class="w-full h-full object-cover group-hover:scale-105 transition duration-300 opacity-80 group-hover:opacity-100" crossorigin="anonymous" loading="lazy">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent opacity-0 group-hover:opacity-100 transition flex items-end p-2.5">
+                            <span class="text-[11px] font-medium text-white truncate font-mono">Cosmic Tiger</span>
+                        </div>
+                    </div>
+                    <div class="sample-card group relative rounded-xl overflow-hidden border border-slate-800/80 cursor-pointer aspect-square bg-slate-950 transition hover:border-neon-cyan shadow-md" data-prompt="An ancient crystal temple hidden deep inside a glowing bioluminescent forest, magical atmosphere, intricate architecture" data-style="Cyberpunk Neon Sci-Fi Hyperdetailed">
+                        <img src="https://placehold.co/300x300/1e1b4b/8b5cf6?text=Crystal+Temple" alt="Sample" class="w-full h-full object-cover group-hover:scale-105 transition duration-300 opacity-80 group-hover:opacity-100" crossorigin="anonymous" loading="lazy">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent opacity-0 group-hover:opacity-100 transition flex items-end p-2.5">
+                            <span class="text-[11px] font-medium text-white truncate font-mono">Crystal Temple</span>
+                        </div>
+                    </div>
+                    <div class="sample-card group relative rounded-xl overflow-hidden border border-slate-800/80 cursor-pointer aspect-square bg-slate-950 transition hover:border-neon-cyan shadow-md" data-prompt="A cozy futuristic coffee shop on Mars looking out over Olympus Mons at sunset, cinematic warm tones" data-style="Anime Studio Ghibli Fantasy Magical Atmosphere">
+                        <img src="https://placehold.co/300x300/451a03/ec4899?text=Mars+Coffee" alt="Sample" class="w-full h-full object-cover group-hover:scale-105 transition duration-300 opacity-80 group-hover:opacity-100" crossorigin="anonymous" loading="lazy">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent opacity-0 group-hover:opacity-100 transition flex items-end p-2.5">
+                            <span class="text-[11px] font-medium text-white truncate font-mono">Mars Coffee</span>
+                        </div>
+                    </div>
+                    <div class="sample-card group relative rounded-xl overflow-hidden border border-slate-800/80 cursor-pointer aspect-square bg-slate-950 transition hover:border-neon-cyan shadow-md" data-prompt="A cute fluffy red panda astronaut floating weightlessly in deep space surrounded by distant glittering galaxies" data-style="Minimalist 3D Render Smooth Claymation">
+                        <img src="https://placehold.co/300x300/030712/06b6d4?text=Astronaut+Panda" alt="Sample" class="w-full h-full object-cover group-hover:scale-105 transition duration-300 opacity-80 group-hover:opacity-100" crossorigin="anonymous" loading="lazy">
+                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent opacity-0 group-hover:opacity-100 transition flex items-end p-2.5">
+                            <span class="text-[11px] font-medium text-white truncate font-mono">Astronaut Panda</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="border-t border-slate-800/80 bg-slate-950/90 py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p class="text-[10px] tracking-widest text-slate-500 uppercase font-mono">POWER BY : ABEL</p>
+        </div>
+    </footer>
+
+    <!-- Full Screen Modal -->
+    <div id="fullScreenModal" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-2xl hidden flex items-center justify-center p-4">
+        <button id="closeModalBtn" class="absolute top-6 right-6 p-3 rounded-full bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition">
+            <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+        <div class="max-w-5xl max-h-[90vh] flex flex-col items-center space-y-4">
+            <img id="modalImage" src="" alt="Full Screen View" class="max-w-full max-h-[80vh] object-contain rounded-xl border border-slate-800 shadow-2xl">
+            <div class="flex items-center space-x-3">
+                <button id="modalDownloadBtn" class="px-5 py-2.5 rounded-xl bg-neon-cyan text-slate-950 font-bold text-xs flex items-center space-x-2 shadow-lg">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    <span>Download High-Res</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 ease-in-out bg-slate-900/95 border border-slate-800 shadow-2xl rounded-xl p-4 flex items-center space-x-3 max-w-md backdrop-blur-xl">
+        <div id="toastIcon" class="w-8 h-8 rounded-lg bg-neon-cyan/10 text-neon-cyan flex items-center justify-center shrink-0">
+            <i data-lucide="check-circle" class="w-5 h-5"></i>
+        </div>
+        <div>
+            <h4 id="toastTitle" class="text-xs font-bold text-white font-mono">System Notice</h4>
+            <p id="toastMessage" class="text-xs text-slate-400 mt-0.5">Operation executed successfully.</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Lucide icons
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+
+            const promptInput = document.getElementById('promptInput');
+            const charCount = document.getElementById('charCount');
+            const generateBtn = document.getElementById('generateBtn');
+            const magicWandBtn = document.getElementById('magicWandBtn');
+            const emptyState = document.getElementById('emptyState');
+            const loadingState = document.getElementById('loadingState');
+            const resultState = document.getElementById('resultState');
+            const generatedImage = document.getElementById('generatedImage');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const shareBtn = document.getElementById('shareBtn');
+            const fullScreenBtn = document.getElementById('fullScreenBtn');
+            const overlayFullScreenBtn = document.getElementById('overlayFullScreenBtn');
+            const fullScreenModal = document.getElementById('fullScreenModal');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const modalImage = document.getElementById('modalImage');
+            const modalDownloadBtn = document.getElementById('modalDownloadBtn');
+            const loadingStatusText = document.getElementById('loadingStatusText');
+            const quotaCountEl = document.getElementById('quotaCount');
+            const quotaBar = document.getElementById('quotaBar');
+            const promptMetaTag = document.getElementById('promptMetaTag');
+
+            let selectedStyle = 'Photorealistic Cinematic 8k Masterpiece';
+            let selectedRatio = '1:1';
+            let lastGeneratedUrl = '';
+            let lastPromptText = '';
+
+            // Quota Management (10 per day)
+            const QUOTA_LIMIT = 10;
+            const TODAY_KEY = 'wtma_ai_quota_date';
+            const COUNT_KEY = 'wtma_ai_quota_count';
+
+            function checkAndGetQuota() {
+                const todayStr = new Date().toDateString();
+                const storedDate = localStorage.getItem(TODAY_KEY);
+                let currentCount = parseInt(localStorage.getItem(COUNT_KEY), 10);
+
+                if (storedDate !== todayStr || isNaN(currentCount)) {
+                    localStorage.setItem(TODAY_KEY, todayStr);
+                    localStorage.setItem(COUNT_KEY, QUOTA_LIMIT);
+                    currentCount = QUOTA_LIMIT;
+                }
+                return currentCount;
+            }
+
+            function updateQuotaDisplay() {
+                const count = checkAndGetQuota();
+                quotaCountEl.textContent = count;
+                const percentage = (count / QUOTA_LIMIT) * 100;
+                quotaBar.style.width = `${percentage}%`;
+                if (count <= 2) {
+                    quotaBar.className = 'h-full bg-gradient-to-r from-red-500 to-pink-500 transition-all duration-500';
+                } else {
+                    quotaBar.className = 'h-full bg-gradient-to-r from-neon-cyan to-neon-purple transition-all duration-500';
+                }
+            }
+
+            function deductQuota() {
+                const count = checkAndGetQuota();
+                if (count > 0) {
+                    localStorage.setItem(COUNT_KEY, count - 1);
+                    updateQuotaDisplay();
+                    return true;
+                }
+                return false;
+            }
+
+            updateQuotaDisplay();
+
+            // Character count listener
+            promptInput.addEventListener('input', () => {
+                const len = promptInput.value.length;
+                charCount.textContent = `${len} / 500`;
+            });
+
+            // Style Selector buttons
+            const styleButtons = document.querySelectorAll('.style-btn');
+            styleButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    styleButtons.forEach(b => {
+                        b.classList.remove('border-neon-cyan', 'bg-neon-cyan/10', 'text-neon-cyan');
+                        b.classList.add('border-slate-800', 'bg-slate-950/60', 'text-slate-400');
+                    });
+                    btn.classList.remove('border-slate-800', 'bg-slate-950/60', 'text-slate-400');
+                    btn.classList.add('border-neon-cyan', 'bg-neon-cyan/10', 'text-neon-cyan');
+                    selectedStyle = btn.getAttribute('data-style');
+                });
+            });
+
+            // Ratio Selector buttons
+            const ratioButtons = document.querySelectorAll('.ratio-btn');
+            ratioButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    ratioButtons.forEach(b => {
+                        b.classList.remove('border-neon-cyan', 'bg-neon-cyan/10', 'text-neon-cyan');
+                        b.classList.add('border-slate-800', 'bg-slate-950/60', 'text-slate-400');
+                    });
+                    btn.classList.remove('border-slate-800', 'bg-slate-950/60', 'text-slate-400');
+                    btn.classList.add('border-neon-cyan', 'bg-neon-cyan/10', 'text-neon-cyan');
+                    selectedRatio = btn.getAttribute('data-ratio');
+                });
+            });
+
+            // Sample Cards
+            document.querySelectorAll('.sample-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const prompt = card.getAttribute('data-prompt');
+                    const style = card.getAttribute('data-style');
+                    promptInput.value = prompt;
+                    charCount.textContent = `${prompt.length} / 500`;
+                    styleButtons.forEach(btn => {
+                        if (btn.getAttribute('data-style') === style) {
+                            btn.click();
+                        }
+                    });
+                    promptInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+            });
+
+            // Magic Wand Prompt Enhancer
+            magicWandBtn.addEventListener('click', () => {
+                const current = promptInput.value.trim();
+                const enhancements = [
+                    "highly detailed volumetric lighting, breathtaking 8k resolution, photorealistic textures, cinematic composition, award-winning digital art",
+                    "ultra-vibrant neon highlights, ray-traced reflections, hyper-detailed futuristic cyberpunk aesthetic, dramatic atmospheric haze",
+                    "magical ethereal glow, intricate ornamentation, fantasy concept art masterpiece, mystical depth of field"
+                ];
+                const randomEnhancement = enhancements[Math.floor(Math.random() * enhancements.length)];
+                if (current) {
+                    promptInput.value = `${current}, ${randomEnhancement}`;
+                } else {
+                    promptInput.value = `A breathtaking futuristic sci-fi metropolis at twilight, ${randomEnhancement}`;
+                }
+                charCount.textContent = `${promptInput.value.length} / 500`;
+                showToast('Magic Enhanced', 'Prompt upgraded with quantum neural modifiers.');
+            });
+
+            // Toast Helper
+            function showToast(title, message, isError = false) {
+                const toast = document.getElementById('toast');
+                const toastTitle = document.getElementById('toastTitle');
+                const toastMessage = document.getElementById('toastMessage');
+                const toastIcon = document.getElementById('toastIcon');
+
+                toastTitle.textContent = title;
+                toastMessage.textContent = message;
+
+                if (isError) {
+                    toastIcon.className = "w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center shrink-0";
+                    toastIcon.innerHTML = `<i data-lucide="alert-triangle" class="w-5 h-5"></i>`;
+                } else {
+                    toastIcon.className = "w-8 h-8 rounded-lg bg-neon-cyan/10 text-neon-cyan flex items-center justify-center shrink-0";
+                    toastIcon.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5"></i>`;
+                }
+                if (window.lucide) lucide.createIcons();
+
+                toast.classList.remove('translate-y-24', 'opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('translate-y-24', 'opacity-0');
+                }, 4000);
+            }
+
+            // Exponential Backoff Fetch Helper
+            async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        if (response.status === 429 && retries > 0) {
+                            await new Promise(res => setTimeout(res, delay));
+                            return fetchWithRetry(url, options, retries - 1, delay * 2);
+                        }
+                        const errData = await response.json().catch(() => ({}));
+                        throw new Error(errData.error?.message || `Server responded with status ${response.status}`);
+                    }
+                    return await response.json();
+                } catch (err) {
+                    if (retries > 0 && (err.name === 'TypeError' || err.message.includes('rate'))) {
+                        await new Promise(res => setTimeout(res, delay));
+                        return fetchWithRetry(url, options, retries - 1, delay * 2);
+                    }
+                    throw err;
+                }
+            }
+
+            // Generate Button Trigger
+            generateBtn.addEventListener('click', async () => {
+                const promptText = promptInput.value.trim();
+                if (!promptText) {
+                    showToast('Input Required', 'Please enter a description for your artwork.', true);
+                    promptInput.focus();
+                    return;
+                }
+
+                if (checkAndGetQuota() <= 0) {
+                    showToast('Quota Exhausted', 'Daily credit limit of 10 reached. Resets tomorrow.', true);
+                    return;
+                }
+
+                if (!deductQuota()) return;
+
+                emptyState.classList.add('hidden');
+                resultState.classList.add('hidden');
+                loadingState.classList.remove('hidden');
+                loadingState.classList.add('flex');
+                generateBtn.disabled = true;
+                generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+                const statusMessages = [
+                    "Initializing neural tensors...",
+                    "Synthesizing compositional lighting...",
+                    "Rendering high-frequency details...",
+                    "Applying quantum color grading..."
+                ];
+                let msgIdx = 0;
+                const statusInterval = setInterval(() => {
+                    msgIdx = (msgIdx + 1) % statusMessages.length;
+                    loadingStatusText.textContent = statusMessages[msgIdx];
+                }, 1500);
+
+                const finalPrompt = `${promptText}, styled in ${selectedStyle}`;
+                lastPromptText = promptText;
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image:generateContent?key=${apiKey}`;
+
+                const payload = {
+                    contents: [{
+                        role: 'user',
+                        parts: [{ text: finalPrompt }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ['IMAGE'],
+                        imageConfig: { aspectRatio: selectedRatio }
+                    }
+                };
+
+                try {
+                    const result = await fetchWithRetry(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    clearInterval(statusInterval);
+
+                    const part = result?.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+                    if (!part || !part.inlineData) {
+                        throw new Error('No image data synthesized by quantum engine.');
+                    }
+
+                    const imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                    lastGeneratedUrl = imageUrl;
+                    generatedImage.src = imageUrl;
+                    modalImage.src = imageUrl;
+                    promptMetaTag.textContent = `"${promptText.substring(0, 25)}..."`;
+
+                    loadingState.classList.remove('flex');
+                    loadingState.classList.add('hidden');
+                    resultState.classList.remove('hidden');
+                    resultState.classList.add('flex');
+
+                    showToast('Success!', 'Quantum artwork synthesized successfully.');
+                } catch (err) {
+                    clearInterval(statusInterval);
+                    loadingState.classList.remove('flex');
+                    loadingState.classList.add('hidden');
+                    emptyState.classList.remove('hidden');
+
+                    showToast('Synthesis Failed', err.message || 'An error occurred during generation.', true);
+                } finally {
+                    generateBtn.disabled = false;
+                    generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            });
+
+            // Download Handler
+            function handleDownload() {
+                if (!lastGeneratedUrl) return;
+                const link = document.createElement('a');
+                link.href = lastGeneratedUrl;
+                link.download = `wtma-ai-${Date.now()}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showToast('Downloaded', 'Artwork saved to your device.');
+            }
+
+            downloadBtn.addEventListener('click', handleDownload);
+            modalDownloadBtn.addEventListener('click', handleDownload);
+
+            // Share Handler
+            shareBtn.addEventListener('click', async () => {
+                if (!lastGeneratedUrl) return;
+                if (navigator.share) {
+                    try {
+                        const res = await fetch(lastGeneratedUrl);
+                        const blob = await res.blob();
+                        const file = new File([blob], 'wtma-artwork.png', { type: 'image/png' });
+                        await navigator.share({
+                            title: 'WTMA.AI Artwork',
+                            text: `Created with WTMA.AI: "${lastPromptText}"`,
+                            files: [file]
+                        });
+                        return;
+                    } catch (e) {
+                        // Fallback to clipboard if share cancelled or failed
+                    }
+                }
+                // Clipboard fallback
+                try {
+                    await navigator.clipboard.writeText(window.location.href);
+                    showToast('Link Copied', 'Studio link copied to clipboard.');
+                } catch (err) {
+                    showToast('Share', 'Sharing not supported on this device.', true);
+                }
+            });
+
+            // Full Screen Modal Controls
+            function openFullScreen() {
+                if (!lastGeneratedUrl) return;
+                fullScreenModal.classList.remove('hidden');
+            }
+
+            fullScreenBtn.addEventListener('click', openFullScreen);
+            overlayFullScreenBtn.addEventListener('click', openFullScreen);
+
+            closeModalBtn.addEventListener('click', () => {
+                fullScreenModal.classList.add('hidden');
+            });
+
+            fullScreenModal.addEventListener('click', (e) => {
+                if (e.target === fullScreenModal) {
+                    fullScreenModal.classList.add('hidden');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
